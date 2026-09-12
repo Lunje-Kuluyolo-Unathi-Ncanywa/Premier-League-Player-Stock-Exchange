@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premier League Player Stock Exchange</title>
+    <!-- Tailwind CSS for Layout Architecture -->
+    <script src="https://tailwindcss.com"></script>
+    <style>
+        /* Official Premier League Palette Design Anchors */
+        :root {
+            --pl-purple: #3d195d;
+            --pl-dark-purple: #1f0833;
+            --pl-neon-green: #00ff87;
+            --pl-pink: #ff007f;
+            --pl-text-light: #ffffff;
+        }
+        body {
+            background-color: var(--pl-dark-purple);
+            color: var(--pl-text-light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .pl-bg-purple { background-color: var(--pl-purple); }
+        .pl-text-green { color: var(--pl-neon-green); }
+        .pl-text-pink { color: var(--pl-pink); }
+        .pl-btn-green { background-color: var(--pl-neon-green); color: var(--pl-dark-purple); font-weight: bold; }
+        .pl-btn-green:hover { background-color: #02e077; }
+        .pl-border-green { border-color: var(--pl-neon-green); }
+        .tab-active { border-bottom: 4px solid var(--pl-neon-green); color: var(--pl-neon-green) !important; }
+        
+        .candle-body { width: 12px; transition: all 0.2s ease; position: relative; }
+        .candle-wick { width: 2px; background-color: #6b7280; position: absolute; left: 50%; transform: translateX(-50%); z-index: 0; }
+        .candle-rect { position: absolute; width: 100%; left: 0; z-index: 10; border-radius: 1px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Global Broadcast Alerts Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- AUTHENTICATION PAGE PORTAL -->
+    <div id="auth-page" class="flex-grow flex items-center justify-center px-4">
+        <div class="w-full max-w-md p-8 rounded-xl pl-bg-purple shadow-2xl border border-gray-800">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-extrabold tracking-tight">PL <span class="pl-text-green">STOCK EXCHANGE</span></h1>
+                <p class="text-gray-300 mt-2 text-sm">Log in using your secure team access credentials</p>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2 font-bold">Access Role</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="role-manager" onclick="setRole('manager')" class="py-2.5 rounded-lg font-bold text-sm bg-purple-900 border-2 pl-border-green text-white">Manager Account</button>
+                    <button id="role-admin" onclick="setRole('admin')" class="py-2.5 rounded-lg font-bold text-sm bg-gray-800 text-gray-400">System Admin</button>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label id="user-label" class="block text-xs uppercase tracking-wider text-gray-400 mb-1 font-bold">Manager Name / Identifier</label>
+                    <input type="text" id="auth-username" class="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-green-400" placeholder="e.g. Gaffer One">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-400 mb-1 font-bold">Security Password</label>
+                    <input type="password" id="auth-password" class="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-green-400" placeholder="••••••••">
+                </div>
+                <button id="btn-login" onclick="handleLogin()" class="w-full py-3 rounded-lg pl-btn-green transition mt-2 shadow-lg">Enter Exchange Floor</button>
+                <p id="auth-error" class="text-sm font-semibold text-center text-red-400 hidden mt-2">❌ Invalid password credentials provided.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD INTERFACE -->
+    <div id="main-app" class="hidden flex flex-col min-h-screen">
+        <!-- Main Top Navigation Panel -->
+        <header class="pl-bg-purple border-b border-purple-900 px-4 py-3 sticky top-0 z-50 shadow-md">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <div>
+                    <span class="text-xs uppercase font-bold tracking-widest pl-text-green" id="display-role">Manager Portal</span>
+                    <h2 class="text-xl font-black text-white tracking-tight" id="display-name">Manager Workspace</h2>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="text-right">
+                        <span class="block text-xs uppercase text-gray-400 font-medium">Available Portfolio Balance</span>
+                        <span class="text-xl font-mono font-bold text-white"><span class="pl-text-green">🪙</span> <span id="wallet-balance">100,000</span> Chips</span>
+                    </div>
+                    <button id="btn-logout" onclick="handleLogout()" class="bg-black/40 hover:bg-black/60 px-3 py-1.5 text-xs font-bold rounded-lg border border-purple-800 transition text-gray-300">Sign Out</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Subsections Tab Menu -->
+        <nav class="bg-black/30 border-b border-purple-950 px-2">
+            <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto text-sm font-bold">
+                <button onclick="switchTab('market')" id="tab-market" class="px-4 py-3.5 text-gray-300 whitespace-nowrap transition tab-active">📈 Player Market</button>
+                <button onclick="switchTab('portfolio')" id="tab-portfolio" class="px-4 py-3.5 text-gray-300 whitespace-nowrap transition">💼 My Portfolio</button>
+                <button onclick="switchTab('fixtures')" id="tab-fixtures" class="px-4 py-3.5 text-gray-300 whitespace-nowrap transition">🗓️ Matches & Commentary</button>
+                <button onclick="switchTab('standings')" id="tab-standings" class="px-4 py-3.5 text-gray-300 whitespace-nowrap transition text-emerald-400">🏆 Live Standings</button>
+                <button onclick="switchTab('admin')" id="tab-admin" class="px-4 py-3.5 text-pink-400 whitespace-nowrap transition hidden">🛡️ Admin Controls</button>
+            </div>
+        </nav>
+
+        <!-- Dashboard View Panel Spaces -->
+        <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6">
+            
+            <!-- SECTION 1: PLAYER MARKET -->
+            <section id="view-market" class="space-y-6">
+                <div class="bg-purple-950/40 p-4 rounded-xl border border-purple-900/60 flex flex-col md:flex-row md:items-center gap-4 justify-between">
+                    <div class="relative flex-grow max-w-md">
+                        <span class="absolute left-3.5 top-3.5 text-gray-400 text-sm">🔍</span>
+                        <input type="text" id="search-player" oninput="filterAndRenderMarket()" class="w-full pl-10 pr-4 py-2.5 rounded-lg bg-black/40 border border-gray-800 text-sm focus:outline-none focus:border-green-400 text-white" placeholder="Search registered asset registry by name or club...">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs uppercase font-bold tracking-wider text-gray-400">Sort Matrix:</span>
+                        <select id="filter-price" onchange="filterAndRenderMarket()" class="p-2.5 rounded-lg bg-black/40 border border-gray-800 text-sm focus:outline-none text-white font-medium bg-purple-950">
+                            <option value="all">Display All Players</option>
+                            <option value="expensive">Highest Valued First</option>
+                            <option value="cheapest">Lowest Valued First</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="chart-drawer" class="hidden bg-black/60 border border-purple-500/30 rounded-xl p-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-mono uppercase tracking-wider text-gray-400">Advanced Stock Analytics</span>
+                            <h3 id="chart-player-title" class="text-xl font-black text-white">Player Performance Candlestick Chart</h3>
+                        </div>
+                        <button onclick="closeChartDrawer()" class="text-xs font-bold text-pink-400 border border-pink-900/40 px-3 py-1 rounded bg-pink-950/20 hover:bg-pink-950/60 transition">✕ Close Chart</button>
+                    </div>
+                    <div class="bg-purple-950/20 border border-purple-900/40 p-4 rounded-lg">
+                        <div class="h-48 w-full flex items-end justify-start space-x-6 overflow-x-auto pt-6 border-b border-gray-800 pb-2 relative" id="candlestick-canvas"></div>
+                        <div class="flex justify-between text-[10px] text-gray-500 font-mono mt-2">
+                            <span>⏮️ Historic Matchweeks</span>
+                            <span>Timeline Performance Axis (1 Candle = 1 Complete Match)</span>
+                            <span>Latest GW Current Close ⏭️</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="market-grid"></div>
+            </section>
+
+            <!-- SECTION 2: PORTFOLIO -->
+            <section id="view-portfolio" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-4">
