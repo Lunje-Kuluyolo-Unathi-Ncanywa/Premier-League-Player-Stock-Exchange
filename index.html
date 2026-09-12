@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premier League Player Stock Exchange</title>
+    <script src="https://tailwindcss.com"></script>
+    <style>
+        :root { --pl-purple: #3d195d; --pl-dark-purple: #1f0833; --pl-neon-green: #00ff87; --pl-pink: #ff007f; }
+        body { background-color: var(--pl-dark-purple); color: #ffffff; font-family: sans-serif; }
+        .pl-bg-purple { background-color: var(--pl-purple); }
+        .pl-text-green { color: var(--pl-neon-green); }
+        .pl-text-pink { color: var(--pl-pink); }
+        .pl-btn-green { background-color: var(--pl-neon-green); color: var(--pl-dark-purple); font-weight: bold; }
+        .nav-item-active { color: var(--pl-neon-green) !important; font-weight: 900; position: relative; }
+        .nav-item-active::after { content: ''; position: absolute; bottom: -12px; left: 0; right: 0; height: 3px; background-color: var(--pl-neon-green); }
+        .candle-body { width: 12px; position: relative; }
+        .candle-wick { width: 2px; background-color: #6b7280; position: absolute; left: 50%; transform: translateX(-50%); }
+        .candle-rect { position: absolute; width: 100%; left: 0; z-index: 10; border-radius: 1px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- AUTH PORTAL -->
+    <div id="auth-page" class="flex-grow flex items-center justify-center px-4">
+        <div class="w-full max-w-md p-8 rounded-xl pl-bg-purple shadow-2xl border border-gray-800">
+            <div class="text-center mb-8"><h1 class="text-3xl font-extrabold">PL <span class="pl-text-green">STOCK EXCHANGE</span></h1></div>
+            <div class="mb-6"><div class="grid grid-cols-2 gap-2">
+                <button id="role-manager" onclick="setRole('manager')" class="py-2.5 rounded-lg font-bold text-sm bg-purple-900 border-2 pl-border-green">Manager</button>
+                <button id="role-admin" onclick="setRole('admin')" class="py-2.5 rounded-lg font-bold text-sm bg-gray-800 text-gray-400">Admin</button>
+            </div></div>
+            <div class="space-y-4">
+                <div><label id="user-label" class="block text-xs font-bold text-gray-400 mb-1">Manager Name</label>
+                <input type="text" id="auth-username" class="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white focus:outline-none" placeholder="e.g. Gaffer One"></div>
+                <div><label class="block text-xs font-bold text-gray-400 mb-1">Security Password</label>
+                <input type="password" id="auth-password" class="w-full p-3 rounded-lg bg-black/40 border border-gray-700 text-white focus:outline-none" placeholder="••••••••"></div>
+                <button onclick="handleLogin()" class="w-full py-3 rounded-lg pl-btn-green shadow-lg">Enter Floor</button>
+                <p id="auth-error" class="text-sm text-center text-red-400 hidden">❌ Invalid Credentials</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="main-app" class="hidden flex flex-col min-h-screen">
+        <header class="pl-bg-purple border-b border-purple-900 px-4 py-3 sticky top-0 z-50 shadow-md">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div><span class="text-[9px] uppercase font-bold pl-text-green block" id="display-role">Manager Portal</span>
+                <h2 class="text-base font-black" id="display-name">Workspace</h2></div>
+                <nav class="flex items-center space-x-6 text-xs uppercase font-bold">
+                    <button onclick="switchTab('market')" id="tab-market" class="text-gray-300 pb-1 nav-item-active">📈 Market</button>
+                    <button onclick="switchTab('portfolio')" id="tab-portfolio" class="text-gray-300 pb-1">💼 Portfolio</button>
+                    <button onclick="switchTab('fixtures')" id="tab-fixtures" class="text-gray-300 pb-1">🗓️ Fixtures</button>
+                    <button onclick="switchTab('standings')" id="tab-standings" class="text-emerald-400 pb-1">🏆 Standings</button>
+                    <button onclick="switchTab('admin')" id="tab-admin" class="text-pink-400 pb-1 hidden">🛡️ Admin</button>
+                </nav>
+                <div class="flex items-center space-x-4"><div class="text-right"><span class="text-[10px] block text-gray-400">Chips</span>
+                <span id="wallet-balance" class="text-sm font-mono font-bold text-white">100,000</span></div>
+                <button onclick="handleLogout()" class="bg-black/40 px-2.5 py-1 text-[11px] font-bold rounded border border-purple-800">Exit</button></div>
+            </div>
+        </header>
+
+        <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6">
+            <!-- MARKET -->
+            <section id="view-market" class="space-y-6">
+                <div class="bg-purple-950/40 p-4 rounded-xl border border-purple-900/60 flex flex-col sm:flex-row gap-4 justify-between">
+                    <input type="text" id="search-player" oninput="filterAndRenderMarket()" class="w-full max-w-md p-2.5 rounded-lg bg-black/40 border border-gray-800 text-sm text-white focus:outline-none" placeholder="Search by name or club...">
+                    <select id="filter-price" onchange="filterAndRenderMarket()" class="p-2.5 rounded-lg bg-purple-950 border border-gray-800 text-sm text-white">
+                        <option value="all">All Players</option><option value="expensive">Highest Price</option><option value="cheapest">Lowest Price</option>
+                    </select>
+                </div>
+                <div id="chart-drawer" class="hidden bg-black/60 border border-purple-500/30 rounded-xl p-6 space-y-4">
+                    <div class="flex justify-between items-center"><h3 id="chart-player-title" class="text-lg font-black">Performance</h3>
+                    <button onclick="closeChartDrawer()" class="text-xs font-bold text-pink-400">✕ Close</button></div>
+                    <div class="bg-purple-950/20 p-4 rounded-lg"><div class="h-48 w-full flex items-end justify-start space-x-6 overflow-x-auto border-b border-gray-800 relative" id="candlestick-canvas"></div></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="market-grid"></div>
+            </section>
+
+            <!-- PORTFOLIO -->
+            <section id="view-portfolio" class="hidden space-y-6"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-4"><h3 class="text-lg font-bold border-b border-purple-900 pb-2">Long Positions</h3><div id="roster-slots-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div></div>
+                <div class="space-y-4"><h3 class="text-lg font-bold border-b border-purple-900 pb-2">Short Contracts</h3><div id="shorts-slots-grid" class="space-y-3"></div></div>
+            </div></section>
+
+            <!-- FIXTURES -->
+            <section id="view-fixtures" class="hidden space-y-4">
+                <div class="flex justify-between items-center border-b border-purple-900 pb-2">
+                    <h3 class="text-xl font-black">Fixtures & Logs</h3>
+                    <select id="fixture-mw-selector" onchange="renderFixtures()" class="bg-purple-950 text-xs p-1.5 rounded border border-purple-800 text-white"></select>
+                </div>
+                <div class="grid grid-cols-1 gap-4" id="fixtures-container"></div>
+            </section>
+
+            <!-- STANDINGS -->
+            <section id="view-standings" class="hidden space-y-4"><h3 class="text-xl font-black mb-2">Leaderboard</h3>
+                <div class="overflow-x-auto rounded-xl bg-purple-950/20 border border-purple-900"><table class="w-full text-sm text-left">
+                    <thead class="bg-purple-950 text-gray-300 text-xs uppercase"><tr><th class="p-4">Rank</th><th class="p-4">Manager</th><th class="p-4">Cash</th><th class="p-4">Equity</th><th class="p-4">Net Value</th></tr></thead>
+                    <tbody id="standings-tbody" class="divide-y divide-purple-900/50"></tbody>
+                </table></div>
+            </section>
+
+            <!-- ADMIN -->
+            <section id="view-admin" class="hidden space-y-6"><div class="bg-gray-900/50 border border-pink-900/40 p-6 rounded-xl space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between gap-4"><div><h3 class="text-xl font-black text-pink-500">🛡️ Admin Panel</h3></div>
+                <button onclick="generateRoundRobinFixtures()" class="bg-purple-600 font-bold text-xs px-4 py-2 rounded">🗓️ Generate Round Robin Schedule</button></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-800 pt-6">
+                    <div class="space-y-4"><h4 class="text-sm font-bold text-gray-400">Create Player</h4><div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="admin-p-name" placeholder="Name" class="p-2.5 rounded bg-black text-sm text-white"><select id="admin-p-team" class="p-2.5 rounded bg-black text-sm text-white">
+                            <option value="Arsenal">Arsenal</option><option value="Aston Villa">Aston Villa</option><option value="Chelsea">Chelsea</option><option value="Liverpool">Liverpool</option><option value="Man City">Man City</option><option value="Man United">Man United</option>
+                        </select><input type="number" id="admin-p-price" placeholder="Initial Price" class="p-2.5 rounded bg-black text-sm text-white">
+                        <select id="admin-p-pos" class="p-2.5 rounded bg-black text-sm text-white"><option value="GK">GK</option><option value="DEF">DEF</option><option value="MID">MID</option><option value="FWD">FWD</option></select>
